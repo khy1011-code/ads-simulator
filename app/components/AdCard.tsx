@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 
 type AdData = {
   pageName: string;
@@ -52,8 +53,23 @@ export default function AdCard() {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [saved, setSaved] = useState(false);
+  const [savedAds, setSavedAds] = useState<{ id: string; name: string; ad_type: string; created_at: string }[]>([]);
+  const [currentAdId, setCurrentAdId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchSavedAds();
+  }, []);
+
+  const fetchSavedAds = async () => {
+    const { data } = await supabase
+      .from("ads")
+      .select("id, name, ad_type, created_at")
+      .order("created_at", { ascending: false });
+    if (data) setSavedAds(data);
+  };
 
   const updateAd = (updates: Partial<AdData>) => {
     setAd((prev) => ({ ...prev, ...updates }));
@@ -95,31 +111,71 @@ export default function AdCard() {
     }
   };
 
-  const handleSave = () => {
-    const saveData = { ...ad, adType, savedAt: new Date().toISOString() };
-    localStorage.setItem("ads-simulator-saved", JSON.stringify(saveData));
+  const handleSave = async () => {
+    setLoading(true);
+    const row = {
+      name: ad.pageName,
+      ad_type: adType,
+      page_name: ad.pageName,
+      body_text: ad.bodyText,
+      headline: ad.headline,
+      subheadline: ad.subheadline,
+      cta_label: ad.ctaLabel,
+      cta_url: ad.ctaUrl,
+      width: ad.width,
+      height: ad.height,
+    };
+
+    if (currentAdId) {
+      await supabase.from("ads").update(row).eq("id", currentAdId);
+    } else {
+      const { data } = await supabase.from("ads").insert(row).select("id").single();
+      if (data) setCurrentAdId(data.id);
+    }
+
+    await fetchSavedAds();
     setSaved(true);
+    setLoading(false);
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleLoad = () => {
-    const data = localStorage.getItem("ads-simulator-saved");
+  const handleLoad = async (id: string) => {
+    setLoading(true);
+    const { data } = await supabase.from("ads").select("*").eq("id", id).single();
     if (data) {
-      const parsed = JSON.parse(data);
-      setAdType(parsed.adType || "static");
+      setCurrentAdId(data.id);
+      setAdType(data.ad_type || "static");
       setAd({
-        pageName: parsed.pageName || DEFAULT_AD.pageName,
-        pageAvatar: parsed.pageAvatar || null,
-        bodyText: parsed.bodyText || DEFAULT_AD.bodyText,
-        media: parsed.media || [],
-        ctaUrl: parsed.ctaUrl || DEFAULT_AD.ctaUrl,
-        ctaLabel: parsed.ctaLabel || DEFAULT_AD.ctaLabel,
-        headline: parsed.headline || DEFAULT_AD.headline,
-        subheadline: parsed.subheadline || DEFAULT_AD.subheadline,
-        width: parsed.width || DEFAULT_AD.width,
-        height: parsed.height || DEFAULT_AD.height,
+        pageName: data.page_name || DEFAULT_AD.pageName,
+        pageAvatar: null,
+        bodyText: data.body_text || DEFAULT_AD.bodyText,
+        media: [],
+        ctaUrl: data.cta_url || DEFAULT_AD.ctaUrl,
+        ctaLabel: data.cta_label || DEFAULT_AD.ctaLabel,
+        headline: data.headline || DEFAULT_AD.headline,
+        subheadline: data.subheadline || DEFAULT_AD.subheadline,
+        width: data.width || DEFAULT_AD.width,
+        height: data.height || DEFAULT_AD.height,
       });
     }
+    setLoading(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    await supabase.from("ads").delete().eq("id", id);
+    if (currentAdId === id) {
+      setCurrentAdId(null);
+      setAd({ ...DEFAULT_AD });
+      setAdType("static");
+    }
+    await fetchSavedAds();
+  };
+
+  const handleNewAd = () => {
+    setCurrentAdId(null);
+    setAd({ ...DEFAULT_AD });
+    setAdType("static");
+    setSaved(false);
   };
 
   const cardMaxWidth = adType === "carousel" ? 500 : Math.max(320, Math.min(ad.width, 700));
@@ -329,17 +385,55 @@ export default function AdCard() {
         <div className="flex gap-3">
           <button
             onClick={handleSave}
-            className="flex-1 py-2.5 rounded-lg bg-[#1877f2] text-white text-[14px] font-semibold hover:bg-[#166fe5] transition-colors"
+            disabled={loading}
+            className="flex-1 py-2.5 rounded-lg bg-[#1877f2] text-white text-[14px] font-semibold hover:bg-[#166fe5] transition-colors disabled:opacity-50"
           >
-            {saved ? "✓ Saved!" : "Save Ad"}
+            {loading ? "Saving..." : saved ? "✓ Saved!" : currentAdId ? "Update Ad" : "Save Ad"}
           </button>
           <button
-            onClick={handleLoad}
+            onClick={handleNewAd}
             className="flex-1 py-2.5 rounded-lg bg-[#e4e6eb] text-[#1c1e21] text-[14px] font-semibold hover:bg-[#d8dadf] transition-colors"
           >
-            Load Saved
+            + New Ad
           </button>
         </div>
+
+        {savedAds.length > 0 && (
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-[#dadde1]">
+            <h2 className="text-[15px] font-semibold mb-3 text-[#1c1e21]">Saved Ads</h2>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              {savedAds.map((item) => (
+                <div
+                  key={item.id}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                    currentAdId === item.id
+                      ? "bg-[#e7f3ff] border border-[#1877f2]"
+                      : "bg-[#f0f2f5] hover:bg-[#e4e6eb]"
+                  }`}
+                  onClick={() => handleLoad(item.id)}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold text-[#1c1e21] truncate">
+                      {item.name}
+                    </div>
+                    <div className="text-[11px] text-[#65676b] capitalize">
+                      {item.ad_type} · {new Date(item.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(item.id);
+                    }}
+                    className="ml-2 text-[12px] text-[#fa3e3e] font-semibold hover:underline shrink-0"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Ad Preview */}
