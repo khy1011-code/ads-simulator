@@ -546,7 +546,7 @@ export default function AdCard() {
               <div
                 className="bg-[#f0f2f5] flex items-center justify-center overflow-hidden relative"
                 style={{
-                  height: adType === "carousel" ? cardMaxWidth : ad.height,
+                  height: ad.height,
                 }}
               >
                 {ad.media.length === 0 ? (
