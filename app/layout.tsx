@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Ads Simulator",
-  description: "Meta-style ad card simulator",
+  title: "Ad Simulator Beta V1",
+  description: "Create and preview Meta-style ad cards",
 };
 
 export default function RootLayout({
