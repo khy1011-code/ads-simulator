@@ -87,6 +87,35 @@ function getCtaText(ad: AdData) {
   return ad.ctaLabel === "Custom" && ad.customCta ? ad.customCta : ad.ctaLabel;
 }
 
+function fileToDataUrl(file: File, maxDim = 800, quality = 0.7): Promise<string> {
+  return new Promise((resolve) => {
+    if (file.type.startsWith("video/")) {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function AdCard() {
   const [mainTab, setMainTab] = useState<"create" | "saved">("create");
   const [ad, setAd] = useState<AdData>(createDefaultAd);
@@ -118,27 +147,28 @@ export default function AdCard() {
   const hasMultipleVariants = ad.bodyCopies.length > 1 || ad.headlines.length > 1;
   const variantCount = Math.max(ad.bodyCopies.length, ad.headlines.length);
 
-  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    Array.from(files).forEach((file) => {
-      const url = URL.createObjectURL(file);
+    for (const file of Array.from(files)) {
       const isVideo = file.type.startsWith("video/");
-      if (ad.adType === "video" && !isVideo) return;
-      if (ad.adType === "static" && isVideo) return;
+      if (ad.adType === "video" && !isVideo) continue;
+      if (ad.adType === "static" && isVideo) continue;
+      const dataUrl = await fileToDataUrl(file);
       if (ad.adType === "carousel") {
-        updateAd({ mediaUrls: [...ad.mediaUrls, url], mediaType: "image" });
+        setAd((p) => ({ ...p, mediaUrls: [...p.mediaUrls, dataUrl], mediaType: "image" }));
       } else {
-        updateAd({ mediaUrls: [url], mediaType: isVideo ? "video" : "image" });
+        updateAd({ mediaUrls: [dataUrl], mediaType: isVideo ? "video" : "image" });
       }
-    });
+    }
     e.target.value = "";
   };
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    updateAd({ pageAvatar: URL.createObjectURL(file) });
+    const dataUrl = await fileToDataUrl(file, 200, 0.8);
+    updateAd({ pageAvatar: dataUrl });
     e.target.value = "";
   };
 
@@ -834,8 +864,7 @@ function SavedAdsTab({ ads, onLoad, onDelete, previewAdId, setPreviewAdId, updat
   const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
 
   const handleShare = (ad: AdData) => {
-    const shareable = { ...ad, mediaUrls: [] as string[], pageAvatar: null };
-    const encoded = btoa(encodeURIComponent(JSON.stringify(shareable)));
+    const encoded = btoa(encodeURIComponent(JSON.stringify(ad)));
     const url = `${window.location.origin}/share#${encoded}`;
     navigator.clipboard.writeText(url);
     setCopiedShareId(ad.id);
