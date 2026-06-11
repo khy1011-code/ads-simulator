@@ -831,6 +831,17 @@ function SavedAdsTab({ ads, onLoad, onDelete, previewAdId, setPreviewAdId, updat
   previewAdId: string | null; setPreviewAdId: (id: string | null) => void;
   updateNotes: (id: string, notes: Note[]) => void;
 }) {
+  const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
+
+  const handleShare = (ad: AdData) => {
+    const shareable = { ...ad, mediaUrls: [] as string[], pageAvatar: null };
+    const encoded = btoa(encodeURIComponent(JSON.stringify(shareable)));
+    const url = `${window.location.origin}/share#${encoded}`;
+    navigator.clipboard.writeText(url);
+    setCopiedShareId(ad.id);
+    setTimeout(() => setCopiedShareId(null), 2500);
+  };
+
   if (ads.length === 0) {
     return (
       <div className="max-w-[1400px] mx-auto p-8 text-center">
@@ -900,11 +911,24 @@ function SavedAdsTab({ ads, onLoad, onDelete, previewAdId, setPreviewAdId, updat
                 <div className="text-[10px] text-[#8a8d91]">{new Date(ad.createdAt).toLocaleDateString()}</div>
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => onLoad(ad)} className="flex-1 py-1.5 rounded-md bg-[#1877f2] text-white text-[12px] font-semibold hover:bg-[#166fe5] transition-colors">Edit</button>
-                  <button onClick={() => setPreviewAdId(ad.id)} className="py-1.5 px-3 rounded-md bg-[#e7f3ff] text-[#1877f2] text-[12px] font-semibold hover:bg-[#d2e8ff] transition-colors">
+                  <button onClick={() => setPreviewAdId(ad.id)} className="py-1.5 px-3 rounded-md bg-[#e7f3ff] text-[#1877f2] text-[12px] font-semibold hover:bg-[#d2e8ff] transition-colors" title="Preview">
                     <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
+                  </button>
+                  <button onClick={() => handleShare(ad)}
+                    className={`py-1.5 px-3 rounded-md text-[12px] font-semibold transition-colors ${copiedShareId === ad.id ? "bg-[#31a24c] text-white" : "bg-[#f0f2f5] text-[#65676b] hover:bg-[#e4e6eb]"}`}
+                    title={copiedShareId === ad.id ? "Link copied!" : "Share link"}>
+                    {copiedShareId === ad.id ? (
+                      <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                      </svg>
+                    )}
                   </button>
                   <button onClick={() => onDelete(ad.id)} className="py-1.5 px-3 rounded-md bg-[#ffebe9] text-[#d1242f] text-[12px] font-semibold hover:bg-[#ffd4d0] transition-colors">Delete</button>
                 </div>
