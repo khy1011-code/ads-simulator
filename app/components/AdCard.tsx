@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
+
+const StrategyBoard = lazy(() => import("./StrategyBoard"));
+const AiChat = lazy(() => import("./AiChat"));
+const LandingPageBuilder = lazy(() => import("./LandingPageBuilder"));
 
 type AdType = "static" | "video" | "carousel";
 type Platform = "meta" | "google" | "tiktok" | "linkedin" | "x";
@@ -117,7 +121,7 @@ function fileToDataUrl(file: File, maxDim = 800, quality = 0.7): Promise<string>
 }
 
 export default function AdCard() {
-  const [mainTab, setMainTab] = useState<"create" | "saved">("create");
+  const [mainTab, setMainTab] = useState<"create" | "saved" | "strategy" | "landing">("create");
   const [ad, setAd] = useState<AdData>(createDefaultAd);
   const [savedAds, setSavedAds] = useState<AdData[]>([]);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -271,20 +275,39 @@ export default function AdCard() {
             <h1 className="text-[18px] font-bold tracking-tight">Ad Simulator</h1>
             <span className="text-[10px] font-bold bg-white/20 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Beta V1</span>
           </div>
-          <div className="flex bg-white/10 rounded-lg p-0.5">
+          <div className="flex bg-white/10 rounded-lg p-0.5 overflow-x-auto">
             <button onClick={() => setMainTab("create")}
-              className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-all ${mainTab === "create" ? "bg-white text-[#1877f2]" : "text-white/80 hover:text-white"}`}>
+              className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-all shrink-0 ${mainTab === "create" ? "bg-white text-[#1877f2]" : "text-white/80 hover:text-white"}`}>
               Create Ad
             </button>
             <button onClick={() => setMainTab("saved")}
-              className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-all ${mainTab === "saved" ? "bg-white text-[#1877f2]" : "text-white/80 hover:text-white"}`}>
+              className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-all shrink-0 ${mainTab === "saved" ? "bg-white text-[#1877f2]" : "text-white/80 hover:text-white"}`}>
               Saved Ad Samples {savedAds.length > 0 && `(${savedAds.length})`}
+            </button>
+            <button onClick={() => setMainTab("strategy")}
+              className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-all shrink-0 ${mainTab === "strategy" ? "bg-white text-[#1877f2]" : "text-white/80 hover:text-white"}`}>
+              Ad Strategy
+            </button>
+            <button onClick={() => setMainTab("landing")}
+              className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-all shrink-0 ${mainTab === "landing" ? "bg-white text-[#1877f2]" : "text-white/80 hover:text-white"}`}>
+              Landing Pages
             </button>
           </div>
         </div>
       </header>
 
-      {mainTab === "saved" ? (
+      {mainTab === "strategy" ? (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="text-[#65676b]">Loading...</div></div>}>
+          <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1"><StrategyBoard /></div>
+            <AiChat />
+          </div>
+        </Suspense>
+      ) : mainTab === "landing" ? (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="text-[#65676b]">Loading...</div></div>}>
+          <LandingPageBuilder />
+        </Suspense>
+      ) : mainTab === "saved" ? (
         <SavedAdsTab ads={savedAds} onLoad={handleLoadAd} onDelete={handleDelete}
           previewAdId={previewAdId} setPreviewAdId={setPreviewAdId}
           updateNotes={updateSavedAdNotes} />
